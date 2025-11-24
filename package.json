@@ -1,0 +1,57 @@
+{
+  "name": "@entro314labs/entro-svelte",
+  "version": "1.0.0",
+  "description": "SvelteKit integration for Entrolytics - First-party growth analytics for the edge",
+  "keywords": [
+    "entrolytics",
+    "analytics",
+    "svelte",
+    "sveltekit",
+    "web-analytics",
+    "tracking"
+  ],
+  "homepage": "https://entrolytics.click",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/entro314-labs/entro-svelte"
+  },
+  "license": "MIT",
+  "author": "Entro314 Labs <hey@entrolytics.click>",
+  "type": "module",
+  "svelte": "./dist/index.js",
+  "exports": {
+    ".": {
+      "svelte": "./dist/index.js",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "lint": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "svelte": ">=5.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.7",
+    "svelte": "^5.43.14",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.x"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false
+}
