@@ -1,5 +1,5 @@
 import { onMount } from 'svelte';
-import { type Writable, writable, get } from 'svelte/store';
+import { get, type Writable, writable } from 'svelte/store';
 
 const DEFAULT_HOST = 'https://cloud.entrolytics.click';
 const SCRIPT_ID = 'entrolytics-script';
@@ -187,7 +187,12 @@ export function trackEvent(eventName: string, eventData?: EventData): void {
  * </script>
  * ```
  */
-export function trackRevenue(eventName: string, revenue: number, currency = 'USD', data?: EventData): void {
+export function trackRevenue(
+  eventName: string,
+  revenue: number,
+  currency = 'USD',
+  data?: EventData,
+): void {
   waitForTracker(() => {
     const eventData: EventData = {
       ...data,
@@ -299,10 +304,7 @@ export function trackPageView(url?: string, referrer?: string): void {
  * </button>
  * ```
  */
-export function trackClick(
-  node: HTMLElement,
-  params: { event: string; data?: EventData },
-) {
+export function trackClick(node: HTMLElement, params: { event: string; data?: EventData }) {
   const handleClick = () => {
     trackEvent(params.event, params.data);
   };
@@ -329,10 +331,7 @@ export function trackClick(
  * </a>
  * ```
  */
-export function outboundLink(
-  node: HTMLAnchorElement,
-  params?: { data?: EventData },
-) {
+export function outboundLink(node: HTMLAnchorElement, params?: { data?: EventData }) {
   const handleClick = () => {
     const url = node.href;
     if (url) {
