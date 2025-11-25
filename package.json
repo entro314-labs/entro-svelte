@@ -10,15 +10,20 @@
     "web-analytics",
     "tracking"
   ],
+  "author": "Entro314 Labs <hey@entrolytics.click>",
+  "license": "MIT",
   "homepage": "https://entrolytics.click",
   "repository": {
     "type": "git",
-    "url": "https://github.com/entro314-labs/entro-svelte"
+    "url": "https://github.com/entro314-labs/entro-svelte",
+    "directory": "entro-svelte"
   },
-  "license": "MIT",
-  "author": "Entro314 Labs <hey@entrolytics.click>",
+  "bugs": {
+    "url": "https://github.com/entro314labs/entrolytics-system/issues"
+  },
   "type": "module",
-  "svelte": "./dist/index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "svelte": "./dist/index.js",
@@ -26,11 +31,18 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.x"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
@@ -38,20 +50,14 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm build"
   },
-  "peerDependencies": {
-    "svelte": ">=5.0.0"
-  },
   "devDependencies": {
     "@biomejs/biome": "2.3.7",
-    "svelte": "^5.43.14",
+    "svelte": "^5.44.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
-  "engines": {
-    "node": ">=20.x"
+  "peerDependencies": {
+    "svelte": ">=5.0.0"
   },
-  "publishConfig": {
-    "access": "public"
-  },
-  "sideEffects": false
+  "svelte": "./dist/index.js"
 }

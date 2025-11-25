@@ -1,8 +1,12 @@
 import { onMount } from 'svelte';
-import { writable, type Writable } from 'svelte/store';
+import { type Writable, writable, get } from 'svelte/store';
 
-const DEFAULT_HOST = 'https://entrolytics.click';
+const DEFAULT_HOST = 'https://cloud.entrolytics.click';
 const SCRIPT_ID = 'entrolytics-script';
+
+export interface EventData {
+  [key: string]: string | number | boolean | EventData | string[] | number[] | EventData[];
+}
 
 export interface EntrolyticsOptions {
   websiteId: string;
@@ -10,21 +14,48 @@ export interface EntrolyticsOptions {
   autoTrack?: boolean;
   respectDnt?: boolean;
   domains?: string[];
+  /** Use edge runtime endpoints for faster response times (default: true) */
+  useEdgeRuntime?: boolean;
+  /** Custom tag for A/B testing */
+  tag?: string;
+  /** Strip query parameters from URLs */
+  excludeSearch?: boolean;
+  /** Strip hash from URLs */
+  excludeHash?: boolean;
+  /** Callback before sending data */
+  beforeSend?: (type: string, payload: unknown) => unknown | null;
 }
 
 declare global {
   interface Window {
     entrolytics?: {
-      track: (eventName: string, eventData?: Record<string, unknown>) => void;
-      identify: (userId: string, traits?: Record<string, unknown>) => void;
+      track: (eventName?: string | object, eventData?: Record<string, unknown>) => void;
+      identify: (data: Record<string, unknown>) => void;
     };
   }
 }
 
 // Store for tracking if script is loaded
 export const isLoaded: Writable<boolean> = writable(false);
+export const isReady: Writable<boolean> = writable(false);
 
 let initialized = false;
+let currentOptions: EntrolyticsOptions | null = null;
+let currentTag: string | undefined;
+
+function waitForTracker(callback: () => void): void {
+  if (typeof window === 'undefined') return;
+
+  const tryExecute = () => {
+    if (window.entrolytics) {
+      callback();
+    } else {
+      setTimeout(tryExecute, 100);
+    }
+  };
+
+  tryExecute();
+}
 
 /**
  * Initialize Entrolytics tracking
@@ -44,6 +75,8 @@ export function initEntrolytics(options: EntrolyticsOptions): void {
   if (initialized) return;
 
   initialized = true;
+  currentOptions = options;
+  currentTag = options.tag;
 
   const {
     websiteId,
@@ -51,6 +84,10 @@ export function initEntrolytics(options: EntrolyticsOptions): void {
     autoTrack = true,
     respectDnt = false,
     domains,
+    useEdgeRuntime = true,
+    tag,
+    excludeSearch = false,
+    excludeHash = false,
   } = options;
 
   if (!websiteId) {
@@ -59,12 +96,16 @@ export function initEntrolytics(options: EntrolyticsOptions): void {
 
   if (document.getElementById(SCRIPT_ID)) {
     isLoaded.set(true);
+    isReady.set(true);
     return;
   }
 
   const script = document.createElement('script');
   script.id = SCRIPT_ID;
-  script.src = `${host.replace(/\/$/, '')}/script.js`;
+
+  // Use edge runtime script if enabled
+  const scriptPath = useEdgeRuntime ? '/script-edge.js' : '/script.js';
+  script.src = `${host.replace(/\/$/, '')}${scriptPath}`;
   script.defer = true;
   script.dataset.websiteId = websiteId;
 
@@ -77,9 +118,19 @@ export function initEntrolytics(options: EntrolyticsOptions): void {
   if (domains && domains.length > 0) {
     script.dataset.domains = domains.join(',');
   }
+  if (tag) {
+    script.dataset.tag = tag;
+  }
+  if (excludeSearch) {
+    script.dataset.excludeSearch = 'true';
+  }
+  if (excludeHash) {
+    script.dataset.excludeHash = 'true';
+  }
 
   script.onload = () => {
     isLoaded.set(true);
+    isReady.set(true);
   };
 
   document.head.appendChild(script);
@@ -101,45 +152,122 @@ export function initEntrolytics(options: EntrolyticsOptions): void {
  * <button on:click={handleClick}>Click me</button>
  * ```
  */
-export function trackEvent(eventName: string, eventData?: Record<string, unknown>): void {
-  if (typeof window === 'undefined') return;
+export function trackEvent(eventName: string, eventData?: EventData): void {
+  waitForTracker(() => {
+    let payload: unknown = { name: eventName, data: eventData };
 
-  const tryTrack = () => {
-    if (window.entrolytics) {
-      window.entrolytics.track(eventName, eventData);
-    } else {
-      setTimeout(tryTrack, 100);
+    if (currentOptions?.beforeSend) {
+      payload = currentOptions.beforeSend('event', payload);
+      if (payload === null) return;
     }
-  };
 
-  tryTrack();
+    if (currentTag) {
+      (payload as Record<string, unknown>).tag = currentTag;
+    }
+
+    window.entrolytics?.track(eventName, eventData);
+  });
 }
 
 /**
- * Identify a user
+ * Track revenue event
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { trackRevenue } from '@entro314labs/entro-svelte';
+ *
+ *   async function handlePurchase(product) {
+ *     await processPayment();
+ *     trackRevenue('purchase', product.price, 'USD', {
+ *       productId: product.id,
+ *       productName: product.name
+ *     });
+ *   }
+ * </script>
+ * ```
+ */
+export function trackRevenue(eventName: string, revenue: number, currency = 'USD', data?: EventData): void {
+  waitForTracker(() => {
+    const eventData: EventData = {
+      ...data,
+      revenue,
+      currency,
+    };
+
+    if (currentTag) {
+      eventData.tag = currentTag;
+    }
+
+    window.entrolytics?.track(eventName, eventData);
+  });
+}
+
+/**
+ * Track outbound link click
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { trackOutboundLink } from '@entro314labs/entro-svelte';
+ *
+ *   function handleExternalClick(url: string) {
+ *     trackOutboundLink(url, { placement: 'sidebar' });
+ *   }
+ * </script>
+ * ```
+ */
+export function trackOutboundLink(url: string, data?: EventData): void {
+  waitForTracker(() => {
+    window.entrolytics?.track('outbound-link-click', {
+      ...data,
+      url,
+    });
+  });
+}
+
+/**
+ * Identify with custom data
  *
  * @example
  * ```svelte
  * <script>
  *   import { identify } from '@entro314labs/entro-svelte';
  *
- *   // When user logs in
- *   identify(user.id, { email: user.email, plan: user.plan });
+ *   identify({ company: 'Acme Corp', plan: 'enterprise' });
  * </script>
  * ```
  */
-export function identify(userId: string, traits?: Record<string, unknown>): void {
-  if (typeof window === 'undefined') return;
+export function identify(data: EventData): void {
+  waitForTracker(() => {
+    window.entrolytics?.identify(data);
+  });
+}
 
-  const tryIdentify = () => {
-    if (window.entrolytics) {
-      window.entrolytics.identify(userId, traits);
-    } else {
-      setTimeout(tryIdentify, 100);
-    }
-  };
+/**
+ * Identify a user by ID
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { identifyUser } from '@entro314labs/entro-svelte';
+ *
+ *   // When user logs in
+ *   identifyUser(user.id, { email: user.email, plan: user.plan });
+ * </script>
+ * ```
+ */
+export function identifyUser(userId: string, traits?: EventData): void {
+  waitForTracker(() => {
+    window.entrolytics?.identify({ id: userId, ...traits });
+  });
+}
 
-  tryIdentify();
+/**
+ * Set tag for A/B testing
+ */
+export function setTag(tag: string): void {
+  currentTag = tag;
 }
 
 /**
@@ -147,20 +275,14 @@ export function identify(userId: string, traits?: Record<string, unknown>): void
  * Useful for SPA navigation
  */
 export function trackPageView(url?: string, referrer?: string): void {
-  if (typeof window === 'undefined') return;
+  waitForTracker(() => {
+    const payload: Record<string, unknown> = {};
+    if (url) payload.url = url;
+    if (referrer) payload.referrer = referrer;
+    if (currentTag) payload.tag = currentTag;
 
-  const tryTrack = () => {
-    if (window.entrolytics) {
-      window.entrolytics.track('pageview', {
-        url: url || window.location.pathname,
-        referrer: referrer || document.referrer,
-      });
-    } else {
-      setTimeout(tryTrack, 100);
-    }
-  };
-
-  tryTrack();
+    window.entrolytics?.track(payload);
+  });
 }
 
 /**
@@ -179,7 +301,7 @@ export function trackPageView(url?: string, referrer?: string): void {
  */
 export function trackClick(
   node: HTMLElement,
-  params: { event: string; data?: Record<string, unknown> }
+  params: { event: string; data?: EventData },
 ) {
   const handleClick = () => {
     trackEvent(params.event, params.data);
@@ -188,7 +310,40 @@ export function trackClick(
   node.addEventListener('click', handleClick);
 
   return {
-    update(newParams: { event: string; data?: Record<string, unknown> }) {
+    update(newParams: { event: string; data?: EventData }) {
+      params = newParams;
+    },
+    destroy() {
+      node.removeEventListener('click', handleClick);
+    },
+  };
+}
+
+/**
+ * Svelte action for tracking outbound links
+ *
+ * @example
+ * ```svelte
+ * <a href="https://example.com" use:outboundLink={{ data: { placement: 'footer' } }}>
+ *   Visit Example
+ * </a>
+ * ```
+ */
+export function outboundLink(
+  node: HTMLAnchorElement,
+  params?: { data?: EventData },
+) {
+  const handleClick = () => {
+    const url = node.href;
+    if (url) {
+      trackOutboundLink(url, params?.data);
+    }
+  };
+
+  node.addEventListener('click', handleClick);
+
+  return {
+    update(newParams?: { data?: EventData }) {
       params = newParams;
     },
     destroy() {
@@ -212,11 +367,13 @@ export function trackClick(
  * </script>
  * ```
  */
-export function usePageView(pageStore: { subscribe: (fn: (value: { url: URL }) => void) => () => void }): void {
+export function usePageView(pageStore: {
+  subscribe: (fn: (value: { url: URL }) => void) => () => void;
+}): void {
   let lastPath = '';
 
   onMount(() => {
-    const unsubscribe = pageStore.subscribe(($page) => {
+    const unsubscribe = pageStore.subscribe($page => {
       const currentPath = $page.url.pathname;
       if (currentPath !== lastPath) {
         lastPath = currentPath;
