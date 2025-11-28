@@ -1,6 +1,6 @@
 {
   "name": "@entro314labs/entro-svelte",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "SvelteKit integration for Entrolytics - First-party growth analytics for the edge",
   "keywords": [
     "entrolytics",
