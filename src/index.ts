@@ -63,6 +63,16 @@ function waitForTracker(callback: () => void): void {
  * Call this in your root +layout.svelte
  *
  * @example
+ * Zero-config (reads from env):
+ * ```svelte
+ * <script>
+ *   import { initEntrolytics } from '@entro314labs/entro-svelte';
+ *   initEntrolytics();
+ * </script>
+ * ```
+ *
+ * @example
+ * Explicit config:
  * ```svelte
  * <script>
  *   import { initEntrolytics } from '@entro314labs/entro-svelte';
@@ -70,17 +80,42 @@ function waitForTracker(callback: () => void): void {
  * </script>
  * ```
  */
-export function initEntrolytics(options: EntrolyticsOptions): void {
+export function initEntrolytics(options: Partial<EntrolyticsOptions> = {}): void {
   if (typeof window === 'undefined') return;
   if (initialized) return;
 
+  // Auto-read from environment variables (SvelteKit)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const env = (import.meta as any).env || {};
+  const websiteId =
+    options.websiteId ||
+    env.VITE_ENTROLYTICS_WEBSITE_ID ||
+    env.PUBLIC_ENTROLYTICS_WEBSITE_ID;
+
+  const host = options.host || env.VITE_ENTROLYTICS_HOST || env.PUBLIC_ENTROLYTICS_HOST;
+
+  if (!websiteId) {
+    if (env.DEV) {
+      console.warn(
+        '[@entro314labs/entro-svelte] Missing websiteId. Add VITE_ENTROLYTICS_WEBSITE_ID or PUBLIC_ENTROLYTICS_WEBSITE_ID to your .env file.',
+      );
+    }
+    throw new Error('[@entro314labs/entro-svelte] websiteId is required');
+  }
+
+  const finalOptions: EntrolyticsOptions = {
+    ...options,
+    websiteId,
+    host: host || DEFAULT_HOST,
+  } as EntrolyticsOptions;
+
   initialized = true;
-  currentOptions = options;
-  currentTag = options.tag;
+  currentOptions = finalOptions;
+  currentTag = finalOptions.tag;
 
   const {
-    websiteId,
-    host = DEFAULT_HOST,
+    websiteId: finalWebsiteId,
+    host: finalHost = DEFAULT_HOST,
     autoTrack = true,
     respectDnt = false,
     domains,
@@ -88,11 +123,7 @@ export function initEntrolytics(options: EntrolyticsOptions): void {
     tag,
     excludeSearch = false,
     excludeHash = false,
-  } = options;
-
-  if (!websiteId) {
-    throw new Error('[@entro314labs/entro-svelte] websiteId is required');
-  }
+  } = finalOptions;
 
   if (document.getElementById(SCRIPT_ID)) {
     isLoaded.set(true);
@@ -105,9 +136,9 @@ export function initEntrolytics(options: EntrolyticsOptions): void {
 
   // Use edge runtime script if enabled
   const scriptPath = useEdgeRuntime ? '/script-edge.js' : '/script.js';
-  script.src = `${host.replace(/\/$/, '')}${scriptPath}`;
+  script.src = `${finalHost.replace(/\/$/, '')}${scriptPath}`;
   script.defer = true;
-  script.dataset.websiteId = websiteId;
+  script.dataset.websiteId = finalWebsiteId;
 
   if (!autoTrack) {
     script.dataset.autoTrack = 'false';

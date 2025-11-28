@@ -51,8 +51,8 @@
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.3.7",
-    "svelte": "^5.44.0",
+    "@biomejs/biome": "2.3.8",
+    "svelte": "^5.45.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },

@@ -17,15 +17,35 @@ pnpm add @entro314labs/entro-svelte
 <script>
   import { initEntrolytics } from '@entro314labs/entro-svelte';
 
-  initEntrolytics({
-    websiteId: 'your-website-id',
-  });
+  // Zero-config: automatically reads from .env
+  initEntrolytics();
 </script>
 
 <slot />
 ```
 
+Add to your `.env` file:
+
+```bash
+VITE_ENTROLYTICS_WEBSITE_ID=your-website-id
+VITE_ENTROLYTICS_HOST=https://entrolytics.click
+
+# Or for SvelteKit static
+PUBLIC_ENTROLYTICS_WEBSITE_ID=your-website-id
+PUBLIC_ENTROLYTICS_HOST=https://entrolytics.click
+```
+
 ## Configuration Options
+
+### Zero-Config (Recommended)
+
+```svelte
+<script>
+  initEntrolytics(); // Reads from env
+</script>
+```
+
+### Explicit Configuration
 
 ```ts
 initEntrolytics({
